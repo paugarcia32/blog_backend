@@ -6,6 +6,10 @@ const User = require('./models/User')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const cookieParser = require('cookie-parser')
+const multer = require('multer')
+const uploadMiddleware = multer({dest: 'uploads/'})
+const fs = require('fs')
+const Post = require('./models/Post')
 require('dotenv').config()
 
 const salt = bcrypt.genSaltSync(10)
@@ -32,25 +36,54 @@ app.post('/register', async (req, res) => {
 })
 
 
+// app.post('/login', async (req, res) => {
+//   const {username,password} = req.body;
+//   const userDoc = await User.findOne({username})
+
+//   if (!userDoc) {
+//     return res.status(400).json("wrong credentials");
+//   }
+
+//   const passOK = bcrypt.compareSync(password, userDoc.password)
+//   res.json(passOK)
+//   if (passOK){
+//     jwt.sign({username, id:userDoc._id}, secret, {}, (err, token) => {
+//       if (err) throw err
+//       res.cookie('token', token).json({
+//         id:userDoc._id,
+//         username,
+//       })
+//     })
+//   } else {
+//     res.status(400).json("wrong credentials")
+//   }
+// })
+
+
 app.post('/login', async (req, res) => {
-  const {username,password} = req.body;
-  const userDoc = await User.findOne({username})
+  const { username, password } = req.body;
+  const userDoc = await User.findOne({ username });
 
   if (!userDoc) {
     return res.status(400).json("wrong credentials");
   }
 
-  const passOK = bcrypt.compareSync(password, userDoc.password)
-  res.json(passOK)
-  if (passOK){
-    jwt.sign({username, id:userDoc._id}, secret, {}, (err, token) => {
-      if (err) throw err
-      res.cookie('token', token).json('ok')
-    })
+  const passOK = bcrypt.compareSync(password, userDoc.password);
+
+  if (passOK) {
+    jwt.sign({ username, id: userDoc._id }, secret, {}, (err, token) => {
+      if (err) throw err;
+      res.cookie('token', token).json({
+        id: userDoc._id,
+        username,
+      });
+    });
   } else {
-    res.status(400).json("wrong credentials")
+    res.status(400).json("wrong credentials");
   }
-})
+});
+
+
 
 app.get('/profile', (req, res) => {
   const {token} = req.cookies
@@ -63,6 +96,56 @@ app.get('/profile', (req, res) => {
 app.post('/logout', (req,res) => {
   res.cookie('token', '').json('ok')
 })
+
+
+// app.post('/post', uploadMiddleware.single('file'), async (req, res) => {
+//   const {originalName,path} = req.file
+//   const parts =  originalName.split('.')
+//   const ext = parts[parts.length -1]
+//   const newPath = path+'.'+ext
+//   fs.renameSync(path, newPath)
+
+//   const {title, summary, content} = req.body;
+//   const postDoc = await Post.create({
+//     title,
+//     summary,
+//     content,
+//     cover: newPath
+//   })
+
+//   res.json(postDoc);
+// })
+app.post('/post', uploadMiddleware.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      throw new Error("No file received.");
+    }
+
+    const { originalname, path } = req.file;
+    if (!originalname || !path) {
+      throw new Error("Invalid file data received.");
+    }
+
+    const parts = originalname.split('.');
+    const ext = parts[parts.length - 1];
+    const newPath = path + '.' + ext;
+    fs.renameSync(path, newPath);
+
+    const { title, summary, content } = req.body;
+    const postDoc = await Post.create({
+      title,
+      summary,
+      content,
+      cover: newPath,
+    });
+
+    res.json(postDoc);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+
 
 
 app.listen(4000);
