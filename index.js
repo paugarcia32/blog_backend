@@ -19,6 +19,8 @@ const secret = process.env.SECRET_KEY
 app.use(cors({credentials:true, origin:process.env.URL}))
 app.use(express.json())
 app.use(cookieParser())
+app.use('/uploads', express.static(__dirname + '/uploads'))
+
 
 mongoose.connect(process.env.DB_URI);
 
@@ -97,6 +99,14 @@ app.post('/logout', (req,res) => {
   res.cookie('token', '').json('ok')
 })
 
+app.get('/post', async (req,res) => {
+  res.json(await Post.find()
+  .populate('author', ['username'])
+  .sort({createdAt: -1})
+  .limit(20)
+  )
+})
+
 
 // app.post('/post', uploadMiddleware.single('file'), async (req, res) => {
 //   const {originalName,path} = req.file
@@ -105,16 +115,24 @@ app.post('/logout', (req,res) => {
 //   const newPath = path+'.'+ext
 //   fs.renameSync(path, newPath)
 
-//   const {title, summary, content} = req.body;
-//   const postDoc = await Post.create({
-//     title,
-//     summary,
-//     content,
-//     cover: newPath
-//   })
+//  const {token} = req.cookies
+//     jwt.verify(token, secret, {}, async (err,info) => {
+//     if (err) throw err
+//     const { title, summary, content } = req.body;
+//     const postDoc = await Post.create({
+//       title,
+//       summary,
+//       content,
+//       cover: newPath,
+//       author: info.id
+//     });
+//     res.json(postDoc);
+//     })
 
-//   res.json(postDoc);
+
 // })
+
+
 app.post('/post', uploadMiddleware.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -131,21 +149,29 @@ app.post('/post', uploadMiddleware.single('file'), async (req, res) => {
     const newPath = path + '.' + ext;
     fs.renameSync(path, newPath);
 
+    const {token} = req.cookies
+    jwt.verify(token, secret, {}, async (err,info) => {
+    if (err) throw err
     const { title, summary, content } = req.body;
     const postDoc = await Post.create({
       title,
       summary,
       content,
       cover: newPath,
+      author: info.id
     });
-
     res.json(postDoc);
+    })
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-
+app.get('/post/:id', async(req, res)=> {
+  const {id} = req.params
+  const postDoc = await Post.findById(id).populate('author', ['username'])
+  res.json(postDoc)
+})
 
 
 app.listen(4000);
