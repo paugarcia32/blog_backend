@@ -79,15 +79,49 @@ app.post('/logout', (req,res) => {
 
 
 
+
+
+
 app.get('/post', async (req, res) => {
+  try {
+    const { page = 1, perPage = 3 } = req.query;
+    const currentPage = parseInt(page);
+    const postsPerPage = parseInt(perPage);
+
+    // Calcular el índice de la primera publicación y el índice de la última publicación en la página actual
+    const indexOfLastPost = currentPage * postsPerPage;
+    const indexOfFirstPost = indexOfLastPost - postsPerPage;
+
+    // Consultar las publicaciones con paginación
+    const posts = await Post.find()
+      .populate('author', ['username'])
+      .populate('tag', ['title'])
+      .sort({ createdAt: -1 })
+      .skip(indexOfFirstPost) // Saltar las publicaciones anteriores a la página actual
+      .limit(postsPerPage); // Limitar el número de publicaciones por página
+
+    // Contar el total de publicaciones en la base de datos para calcular el total de páginas
+    const totalPosts = await Post.countDocuments();
+    const totalPages = Math.ceil(totalPosts / postsPerPage);
+
+    // Comprueba si hay publicaciones (posts) en la base de datos
+    if (posts.length === 0) {
+      return res.status(404).json({ message: "No se encontraron publicaciones." });
+    }
+
+    res.json({ posts, totalPages });
+  } catch (error) {
+    res.status(500).json({ message: "Error al obtener las publicaciones." });
+  }
+});
+
+app.get('/post/all', async (req, res) => {
   try {
     const posts = await Post.find()
       .populate('author', ['username'])
-      .populate('tag', ['title']) // Agregar la población de los tags
-      .sort({ createdAt: -1 })
-      .limit(20);
+      .populate('tag', ['title'])
+      .sort({ createdAt: -1 });
 
-    // Comprueba si hay publicaciones (posts) en la base de datos
     if (posts.length === 0) {
       return res.status(404).json({ message: "No se encontraron publicaciones." });
     }
@@ -97,7 +131,6 @@ app.get('/post', async (req, res) => {
     res.status(500).json({ message: "Error al obtener las publicaciones." });
   }
 });
-
 
 
 
