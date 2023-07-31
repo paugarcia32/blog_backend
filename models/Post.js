@@ -8,6 +8,7 @@ const PostSchema = new Schema({
   cover: String,
   author: { type: Schema.Types.ObjectId, ref: 'User' },
   tag: [{ type: Schema.Types.ObjectId, ref: 'Tag' }],
+  comments: [{ type: Schema.Types.ObjectId, ref: 'Comment' }],
 },
 {
   timestamps: true

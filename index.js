@@ -11,6 +11,8 @@ const uploadMiddleware = multer({dest: 'uploads/'})
 const fs = require('fs')
 const Post = require('./models/Post')
 const Tag = require('./models/Tag')
+const Comment = require('./models/Comment'); // Asegúrate de que la ruta al modelo de comentarios sea correcta
+
 require('dotenv').config()
 
 const salt = bcrypt.genSaltSync(10)
@@ -198,38 +200,7 @@ app.get('/post/:id', async(req, res)=> {
   res.json(postDoc)
 })
 
-// app.put('/post',uploadMiddleware.single('file'), async (req, res) =>{
-//   let newPath = null
-//   if (req.file){
-//     const { originalname, path } = req.file;
-//     const parts = originalname.split('.');
-//     const ext = parts[parts.length - 1];
-//     newPath = path + '.' + ext;
-//     fs.renameSync(path, newPath);
-//   }
 
-//   const {token} = req.cookies
-//    jwt.verify(token, secret, {}, async (err,info) => {
-//     if (err) throw err
-//     const {id, title, summary, content } = req.body;
-//     const postDoc = await Post.findById(id)
-//     const isAuthor = JSON.stringify(postDoc.author) === JSON.stringify(info.id)
-//     if (!isAuthor) {
-//       return res.status(400).json('you are not the author')
-//     }
-
-//     await postDoc.updateOne({
-//       title,
-//       summary,
-//       content,
-//       cover:newPath ? newPath : postDoc.cover,
-//     })
-
-//     res.json(postDoc);
-//     })
-
-
-// })
 
 app.put('/post/:id', uploadMiddleware.single('file'), async (req, res) => {
   try {
@@ -340,10 +311,97 @@ app.get('/posts/:tagId', async (req, res) => {
 
 
 
+app.post('/post/:id/comment', async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const { autor, contenido } = req.body;
+
+    // Crear el nuevo comentario con la fecha actual en formato ISO 8601
+    const newComment = await Comment.create({
+      autor,
+      contenido,
+      fecha_comentario: new Date().toISOString(),
+      likes: 0, // Inicializar los likes en 0 (puedes ajustar esto según tus necesidades)
+    });
+
+    // Buscar el post al que se va a agregar el comentario
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ error: "El post no existe." });
+    }
+
+    // Agregar el nuevo comentario al post y guardar el post actualizado
+    post.comments.push(newComment);
+    await post.save();
+
+    res.json(newComment);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+
+app.post('/post/:id/comment/:commentId/subcomment', async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const commentId = req.params.commentId;
+    const { autor, fecha_comentario, contenido, likes } = req.body;
+
+    // Crear el nuevo subcomentario
+    const newSubcomment = {
+      autor,
+      fecha_comentario,
+      contenido,
+      likes,
+    };
+
+    // Buscar el post al que pertenece el comentario padre
+    const post = await PostModel.findById(postId);
+    if (!post) {
+      return res.status(404).json({ error: "El post no existe." });
+    }
+
+    // Buscar el comentario padre al que se va a agregar el subcomentario
+    const parentComment = post.comments.find((comment) => comment._id.toString() === commentId);
+    if (!parentComment) {
+      return res.status(404).json({ error: "El comentario padre no existe en este post." });
+    }
+
+    // Agregar el nuevo subcomentario al comentario padre y guardar el post actualizado
+    parentComment.subcomentarios.push(newSubcomment);
+    await post.save();
+
+    res.json(newSubcomment);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// app.js (o el archivo donde tienes configurado tu servidor)
+
+
+app.get('/post/:id/comments', async (req, res) => {
+  try {
+    const postId = req.params.id;
+
+    // Busca el post con sus comentarios asociados utilizando populate
+    const postWithComments = await Post.findById(postId)
+      .populate('comments') // Popula los comentarios en el campo 'comments'
+      .exec();
+
+    // Comprueba si el post existe
+    if (!postWithComments) {
+      return res.status(404).json({ error: "El post no existe." });
+    }
+
+    res.json(postWithComments.comments); // Envía los comentarios asociados al post
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener los comentarios." });
+  }
+});
+
+
+
+
 app.listen(4000);
 
-// UB4KtZUKCea6tOHA
-// mongodb+srv://paugarcia32:<UB4KtZUKCea6tOHA>@cluster0.a1t0quf.mongodb.net/?retryWrites=true&w=majority
-
-// kHsVMM5Tm1Bw5yus
-// mongodb+srv://paugarcia32:<password>@cluster0.pma0esm.mongodb.net/?retryWrites=true&w=majority
