@@ -400,6 +400,37 @@ app.get('/post/:id/comments', async (req, res) => {
   }
 });
 
+app.get('/post/:id/related', async (req, res) => {
+  try {
+    const postId = req.params.id;
+
+    // Obtener el post actual por ID
+    const post = await Post.findById(postId).populate('tag');
+
+    if (!post) {
+      return res.status(404).json({ error: "El post no existe." });
+    }
+
+    // Obtener los tags del post actual
+    const postTags = post.tag.map(tag => tag._id);
+
+    // Buscar otros posts que tengan los mismos tags (excepto el post actual)
+    const relatedPosts = await Post.find({
+      _id: { $ne: postId }, // Excluir el post actual
+      tag: { $in: postTags }, // Buscar posts que tengan algún tag en común
+    })
+      .populate('author', ['username'])
+      .populate('tag', ['title'])
+      .limit(5) // Limitar el número de posts relacionados a mostrar (puedes ajustarlo según tus necesidades)
+      .sort({ createdAt: -1 });
+
+    res.json(relatedPosts);
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener los posts relacionados." });
+  }
+});
+
+
 
 
 
